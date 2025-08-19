@@ -28,7 +28,7 @@ pub fn display_prompt(multi_line: bool) {
     io::stdout().flush().unwrap();
 }
 
-fn get_home_dir() -> Option<PathBuf> {
+pub fn get_home_dir() -> Option<PathBuf> {
     #[cfg(unix)]
     {
         env::var_os("HOME").map(PathBuf::from)

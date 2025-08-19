@@ -1,7 +1,14 @@
-
+use crate::utils::prompt::get_home_dir;
 
 pub fn cmd_echo(args: &Vec<String>) {
-    println!("{}", handle_escapes(&args.join(" ")));
+    let output = handle_escapes(&args.join(" "));
+    if output == "~" {
+        if let Some(dir) = get_home_dir() {
+            println!("{}", dir.display())
+        }
+    } else {
+        println!("{}", output);
+    }
 }
 
 

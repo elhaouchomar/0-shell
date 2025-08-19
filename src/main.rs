@@ -13,9 +13,11 @@ fn main() {
         utils::prompt::display_prompt(multi_line);
         
         input += &utils::input::get_input();
-        if utils::input::input_has_unclosed_quotes(&input) {
+        if utils::input::input_has_unclosed_quotes(&input) || input.ends_with('\\') {
             multi_line = true;
-            input.push('\n');
+            if !input.ends_with('\\') {
+                input.push('\n');
+            }
             continue;
         } else {
             multi_line = false;
@@ -24,13 +26,25 @@ fn main() {
 
         let command = utils::parser::pasre_input(&input);
         match command.name.as_str() {
+            "l" | "ls" | "ll" | "la" => {
+                commands::ls::cmd_ls(&command.name, &command.args);
+            },
             "pwd" => {
                 commands::pwd::cmd_pwd();
             },
             "echo" => {
                 commands::echo::cmd_echo(&command.args);
             },
-            _ => println!("ksjdsd")
+            "cd" => {
+                commands::cd::cmd_cd(&command.args);
+            },
+            "exit" => {
+                commands::exit::cmd_exit()
+            },
+            "clear" => {
+                commands::clear::cmd_clear()
+            }
+            _ => println!("\x1b[33m{}\x1b[0m: Command not found", command.name)
         }
         // println!("{:?}", utils::parser::pasre_input(&input));
     }
