@@ -1,5 +1,7 @@
-use std::path::Path;
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
+use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 
 struct LsOptions {
@@ -8,7 +10,17 @@ struct LsOptions {
     show_suffix: bool,
 }
 
-pub fn cmd_ls(name: &String, args: &Vec<String>) {
+// struct FileInfo {
+//     name: String,
+//     size: u32,
+//     permissions: String,
+//     links: u32,
+//     user: String,
+//     group: String,
+//     time: String,
+// }
+
+pub fn cmd_ls(args: &Vec<String>) {
     let mut options = LsOptions {
         show_hidden: false,
         show_long: false,
@@ -22,37 +34,22 @@ pub fn cmd_ls(name: &String, args: &Vec<String>) {
                 match c {
                     'l' => {
                         options.show_long = true;
-                    },
+                    }
                     'a' => {
                         options.show_hidden = true;
-                    },
+                    }
                     'F' => {
                         options.show_suffix = true;
-                    },
+                    }
                     _ => {
                         println!("\x1b[33mls\x1b[0m: Not a valid option {}", arg);
-                        return
+                        return;
                     }
                 }
             }
         } else {
             paths.push(arg.to_string())
         }
-    }
-
-    match name.as_str() {
-        "la" => {
-            options.show_hidden = true;
-        },
-        "ll" => {
-            options.show_hidden = true;
-            options.show_long = true;
-            options.show_suffix = true;
-        },
-        "l" => {
-            options.show_suffix = true;
-        },
-        _ => ()
     }
 
     if paths.is_empty() {
@@ -62,66 +59,84 @@ pub fn cmd_ls(name: &String, args: &Vec<String>) {
     // println!("hidden: {}, long: {}, sufix: {}\n{:?}", options.show_hidden, options.show_long, options.show_suffix, paths);
     for path in paths {
         let path = Path::new(&path);
+        println!("{:?}", path);
         if path.is_file() {
             // Show file only
-            println!("file");
+            // println!("file");
+            // let metadata = fs::metadata(&path).unwrap();
+            get_file_info(path);
+            // println!("Permissions: {:?}", metadata.permissions().mode());
         } else if path.is_dir() {
             // list_dir(path, &flags);
-            list_dir(path, &options);
+            // list_dir(path, &options);
             // println!("dir");
         } else {
-            println!("\x1b[33mls\x1b[0m: Can not access \'{}\': No such file or directory", path.display());
+            println!(
+                "\x1b[33mls\x1b[0m: Can not access \'{}\': No such file or directory",
+                path.display()
+            );
         }
     }
 }
 
-fn list_dir(path: &Path, options: &LsOptions) {
-    let mut entries = vec![];
+fn get_file_info(path: &Path) {
+    let metadata = fs::symlink_metadata(path).unwrap();
+    println!("{} {}", get_permissions(&path), metadata.nlink());
+}
 
-    if options.show_hidden {
-        entries.push(PathBuf::from("."));
-        entries.push(PathBuf::from(".."));
+fn get_file_type_char(mode: u32) -> char {
+    match mode & libc::S_IFMT {
+        libc::S_IFREG => '-',  // regular file
+        libc::S_IFDIR => 'd',  // directory
+        libc::S_IFLNK => 'l',  // symlink
+        libc::S_IFCHR => 'c',  // character device
+        libc::S_IFBLK => 'b',  // block device
+        libc::S_IFIFO => 'p',  // named pipe (FIFO)
+        libc::S_IFSOCK => 's', // socket
+        _ => '?',              // unknown
     }
+}
 
-    // let entries = fs::read_dir(path).unwrap();
-    for entry in fs::read_dir(path).unwrap() {
-        let entry = entry.unwrap();
-        let path = entry.path();
+fn get_permission_char(mode: u32, read: u32, write: u32, exec: u32) -> [char; 3] {
+    [
+        if mode & read != 0 { 'r' } else { '-' },
+        if mode & write != 0 { 'w' } else { '-' },
+        if mode & exec != 0 { 'x' } else { '-' },
+    ]
+}
 
-        if !options.show_hidden {
-            let name = path.file_name().unwrap().to_string_lossy();
-            if name.starts_with('.') {
-                continue;
-            }
-        }
+fn get_permissions(path: &Path) -> String {
+    let metadata = fs::symlink_metadata(path).unwrap();
+    let mode = metadata.permissions().mode();
 
-        entries.push(path);
-    }
-    // println!("{:?}", entries);
-    for path in entries {
-        let metadata = fs::metadata(&path).unwrap();
-        
-        let mut name: String = if path.ends_with(".") {
-            ".".into()
-        } else if path.ends_with("..") {
-            "..".into()
-        } else {
-            match path.file_name() {
-                Some(n) => n.to_string_lossy().to_string(),
-                None => "".to_string(),
-            }
-        };
+    let mut perms = String::new();
 
-        // let mut display_name = name.to_string();
-        if options.show_suffix {
-            if metadata.is_dir() {
-                name.push('/');
-            }
-        }
+    // File type character
+    perms.push(get_file_type_char(mode));
 
-        print!("{}   ",name);
-        // break;
+    // Owner (user)
+    perms.extend(get_permission_char(
+        mode,
+        libc::S_IRUSR,
+        libc::S_IWUSR,
+        libc::S_IXUSR,
+    ));
 
-    }
-    println!();
+    // Group
+    perms.extend(get_permission_char(
+        mode,
+        libc::S_IRGRP,
+        libc::S_IWGRP,
+        libc::S_IXGRP,
+    ));
+
+    // Others
+    perms.extend(get_permission_char(
+        mode,
+        libc::S_IROTH,
+        libc::S_IWOTH,
+        libc::S_IXOTH,
+    ));
+
+    perms
 }
