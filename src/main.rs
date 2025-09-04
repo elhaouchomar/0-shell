@@ -26,8 +26,8 @@ fn main() {
 
         let command = utils::parser::pasre_input(&input);
         match command.name.as_str() {
-            "l" | "ls" | "ll" | "la" => {
-                commands::ls::cmd_ls(&command.name, &command.args);
+            "ls" => {
+                commands::ls::cmd_ls(&command.args);
             },
             "pwd" => {
                 commands::pwd::cmd_pwd();
