@@ -81,7 +81,7 @@ pub fn cmd_ls(args: &Vec<String>) {
 
 fn get_file_info(path: &Path) {
     let metadata = fs::symlink_metadata(path).unwrap();
-    println!("{} {}", get_permissions(&path), metadata.nlink());
+    println!("{} {}", get_permissions(&path), metadata.nlink(), );
 }
 
 fn get_file_type_char(mode: u32) -> char {

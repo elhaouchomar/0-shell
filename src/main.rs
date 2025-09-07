@@ -43,6 +43,9 @@ fn main() {
             },
             "clear" => {
                 commands::clear::cmd_clear()
+            },
+            "cat" => {
+                commands::cat::cmd_cat(&command.args)
             }
             _ => println!("\x1b[33m{}\x1b[0m: Command not found", command.name)
         }

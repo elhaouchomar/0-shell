@@ -4,3 +4,4 @@ pub mod cd;
 pub mod pwd;
 pub mod clear;
 pub mod exit;
+pub mod cat;
