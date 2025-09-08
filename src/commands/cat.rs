@@ -1,7 +1,8 @@
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};
+use crate::utils::parser::Arg;
 
-pub fn cmd_cat(args: &[String]) {
+pub fn cmd_cat(args: &[Arg]) {
     if args.is_empty() {
         let stdin = io::stdin();
         for line in stdin.lock().lines() {
@@ -11,8 +12,9 @@ pub fn cmd_cat(args: &[String]) {
             }
         }
     } else {
-        for filename in args {
-            match File::open(&filename) {
+        for arg in args {
+            let filename = &arg.value;
+            match File::open(filename) {
                 Ok(file) => {
                     let mut reader = BufReader::new(file);
                     let mut buffer = String::new();

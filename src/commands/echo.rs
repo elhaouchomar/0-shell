@@ -1,20 +1,35 @@
 use crate::utils::prompt::get_home_dir;
+use crate::utils::parser::Arg;
 
-pub fn cmd_echo(args: &Vec<String>) {
-    let output = handle_escapes(&args.join(" "));
-    if output == "~" {
-        if let Some(dir) = get_home_dir() {
-            println!("{}", dir.display())
+pub fn cmd_echo(args: &Vec<Arg>) {
+    let mut output_parts = Vec::new();
+
+    for arg in args {
+        if arg.value == "~" && !arg.quoted {
+            if let Some(home) = get_home_dir() {
+                output_parts.push(home.display().to_string());
+            } else {
+                output_parts.push("~".to_string());
+            }
+        } else if arg.value.starts_with("~/") && !arg.quoted {
+            if let Some(home) = get_home_dir() {
+                let expanded = format!("{}/{}", home.display(), &arg.value[2..]);
+                output_parts.push(expanded);
+            } else {
+                output_parts.push(arg.value.clone())
+            }
+        } else {
+            output_parts.push(handle_escapes(&arg.value));
         }
-    } else {
-        println!("{}", output);
     }
+    println!("{}", output_parts.join(" "));
 }
 
 
 fn handle_escapes(input: &str) -> String {
     let mut result = String::new();
     let mut chars = input.chars();
+    let mut count = 0;
 
     while let Some(c) = chars.next() {
         if c == '\\' {
@@ -24,6 +39,11 @@ fn handle_escapes(input: &str) -> String {
                 Some('\'') => result.push('\''),
                 Some('"') => result.push('\"'),
                 Some('\\') => result.push('\\'),
+                Some('f') => {
+                    result.push('\n');
+                    result.push_str(&" ".repeat(count));
+                },
+                Some('v') => result.push_str("\n\n\n\n"),
                 Some(c) => {
                     result.push('\\');
                     result.push(c);
@@ -33,6 +53,7 @@ fn handle_escapes(input: &str) -> String {
         } else {
             result.push(c)
         }
+        count += 1
     }
 
     result
