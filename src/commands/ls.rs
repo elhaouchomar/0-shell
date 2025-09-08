@@ -1,6 +1,9 @@
 use std::path::{Path};
-use std::fs;
-use std::os::unix::fs::{PermissionsExt};
+use std::time::SystemTime;
+use chrono::{DateTime, Local};
+use libc::{major, minor};
+use std::fs::{self, Metadata};
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::PathBuf;
 
 struct LsOptions {
@@ -60,6 +63,35 @@ pub struct FileInfo {
     pub mod_date: String,
     pub user: String,
     pub group: String,
+}
+pub struct LFormat {
+    pub nlink_len: usize,
+    pub user_len: usize,
+    pub group_len: usize,
+    pub size_len: usize,
+    pub major_len: usize,
+    pub minor_len: usize,
+    pub date_len: usize
+}
+
+impl LFormat {
+    pub fn new() -> Self {
+        Self { nlink_len: 0, user_len: 0, group_len: 0, size_len: 0, major_len: 0, minor_len: 0, date_len: 0 }
+    }
+}
+
+impl FileInfo {
+    pub fn print_long(&self, w: &LFormat) {
+        let size = if self.typee == CharDevice || self.typee == BlockDevice {
+            format!("{:>min_w$}, {:>maj_w$}", self.minor.unwrap().to_string(), self.major.unwrap().to_string(), min_w = w.minor_len, maj_w = w.major_len)
+        } else {
+            format!("{:>w$}", self.size, w = w.size_len)
+        };
+
+        let max_s = w.size_len.max(w.major_len + w.minor_len + 2);
+
+        println!("{} {:>lin_w$} {:<u_w$} {:<g_w$} {:>max_s$} {:<d_w$} {}", self.premession, self.nlink, self.user, self.group, size, self.mod_date, self.name, lin_w = w.nlink_len, u_w = w.user_len, g_w = w.group_len, max_s = max_s, d_w = w.date_len)
+    }
 }
 
 pub fn cmd_ls(args: &Vec<String>) {
@@ -127,16 +159,6 @@ pub fn cmd_ls(args: &Vec<String>) {
         }
     }
 
-    if !options.show_long {
-        simple_print(&mut files, &options);
-    } else {
-        files.iter_mut().for_each(|f| {
-            println!("{}  ", f.name);
-        });
-    }
-}
-
-fn simple_print(files: &mut Vec<FileInfo>, options: &LsOptions) {
     files.sort_by(|a, b| {
         if a.name == "." { return std::cmp::Ordering::Less; }
         if b.name == "." { return std::cmp::Ordering::Greater; }
@@ -145,14 +167,11 @@ fn simple_print(files: &mut Vec<FileInfo>, options: &LsOptions) {
         a.name.trim_matches('.').to_lowercase().cmp(&b.name.trim_matches('.').to_lowercase())
     });
 
-    files.iter_mut().for_each(|f| {
-        if options.show_hidden {
-            print!("{}  ", f.name.trim())
-        } else if !f.name.starts_with('.') {
-            print!("{}  ", f.name.trim())
-        }
-    });
-    println!()
+    if !options.show_long {
+        simple_print(&files, &options);
+    } else {
+        long_print(&files, options.show_hidden);
+    }
 }
 
 fn get_file_info(path: &Path, options: &LsOptions) -> FileInfo {
@@ -178,33 +197,32 @@ fn get_file_info(path: &Path, options: &LsOptions) -> FileInfo {
             let f_type = get_file_type(mode);
             classify_name(&mut name, options, &f_type, path);
 
+            file_info.name = name;
             if !options.show_long {
-                file_info.name = name;
                 return file_info;
             }
 
             file_info.premession = get_permissions(mode, &f_type);
+            file_info.nlink = meta.nlink();
+            file_info.user = get_user_name(meta.uid());
+            file_info.group = get_group_name(meta.gid());
+            
+            if f_type == CharDevice || f_type == BlockDevice {
+                let rdev = meta.rdev();
+                file_info.major = Some(major(rdev));
+                file_info.minor = Some(minor(rdev));
+            } else {
+                file_info.size = meta.size()
+            }
+            file_info.typee = f_type;
+            file_info.mod_date = get_mod_time(&meta);
+
             
             // println!("{}",premession);
             file_info
         },
         Err(_) => file_info
     }
-    
-     
-   
-
-    // FileInfo {
-    //     name: display_name,
-    //     premession: "".to_string(),
-    //     size: 0,
-    //     nlink: 0,
-    //     major: None,
-    //     minor: None,
-    //     mod_date: "".to_string(),
-    //     user: "".to_string(),
-    //     group: "".to_string()
-    // }
 }
 
 fn get_file_name(path: &Path) -> String {
@@ -278,3 +296,100 @@ fn classify_name(name: &mut String, options: &LsOptions, f_type: &FileType, path
         }
     }
 }
+
+
+use users::{get_user_by_uid, get_group_by_gid};
+fn get_user_name(uid: u32) -> String {
+    match get_user_by_uid(uid) {
+        Some(user) => user.name().to_string_lossy().to_string(),
+        None => uid.to_string()
+    }
+}
+
+fn get_group_name(gid: u32) -> String {
+    match get_group_by_gid(gid) {
+        Some(group) => group.name().to_string_lossy().to_string(),
+        None => gid.to_string()
+    }
+}
+
+fn get_mod_time(meta: &Metadata) -> String {
+    let last_mod_time = meta.modified().unwrap_or(SystemTime::now());
+    let last_mod_time: DateTime<Local> = DateTime::from(last_mod_time);
+    let now: DateTime<Local> = SystemTime::now().into();
+    let six_months = chrono::Duration::days(180);
+
+    if now - last_mod_time > six_months {
+        last_mod_time.format("%b %e  %Y").to_string()
+    } else {
+        last_mod_time.format("%b %e %H:%M").to_string()
+    }
+}
+
+fn simple_print(files:  &Vec<FileInfo>, options: &LsOptions) {
+    files.iter().for_each(|f| {
+        if options.show_hidden {
+            print!("{}  ", f.name.trim())
+        } else if !f.name.starts_with('.') {
+            print!("{}  ", f.name.trim())
+        }
+    });
+    println!()
+}
+
+fn long_print(files: &Vec<FileInfo>, show_hidden: bool) {
+    let mut format = LFormat::new();
+    files.iter().for_each(|f| {
+        let nlink_str = f.nlink.to_string();
+        let size_str = f.size.to_string();
+
+        if nlink_str.len() > format.nlink_len {
+            format.nlink_len = nlink_str.len()
+        }
+
+        if f.user.len() > format.user_len {
+            format.user_len = f.user.len()
+        }
+
+        if f.group.len() > format.group_len {
+            format.group_len = f.group.len()
+        }
+
+        if size_str.len() > format.size_len {
+            format.size_len = size_str.len()
+        }
+
+        if f.mod_date.len() > format.date_len {
+            format.date_len = f.mod_date.len();
+        }
+
+        match f.major {
+            Some(v) => {
+                let v = v.to_string();
+                if v.len() > format.major_len {
+                    format.major_len = v.len()
+                }
+            },
+            None => ()
+        }
+
+        match f.minor {
+            Some(v) => {
+                let v = v.to_string();
+                if v.len() > format.minor_len {
+                    format.minor_len = v.len()
+                }
+            },
+            None => ()
+        }
+    });
+
+    files.iter().for_each(|f| {
+        if show_hidden {
+            f.print_long(&format);
+        } else if !f.name.starts_with('.') {
+            f.print_long(&format);
+        }
+    })
+}
+
