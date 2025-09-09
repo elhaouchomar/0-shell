@@ -12,7 +12,7 @@ struct LsOptions {
     show_suffix: bool,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum FileType {
     Regular(u8),
     Directory,
@@ -52,6 +52,7 @@ impl FileType {
     }
 }
 
+#[derive(Debug)]
 pub struct FileInfo {
     pub name: String,
     pub premession: String,
@@ -83,7 +84,7 @@ impl LFormat {
 impl FileInfo {
     pub fn print_long(&self, w: &LFormat) {
         let size = if self.typee == CharDevice || self.typee == BlockDevice {
-            format!("{:>min_w$}, {:>maj_w$}", self.minor.unwrap().to_string(), self.major.unwrap().to_string(), min_w = w.minor_len, maj_w = w.major_len)
+            format!("{:>maj_w$}, {:>min_w$}", self.major.unwrap().to_string(), self.minor.unwrap().to_string(), min_w = w.minor_len, maj_w = w.major_len)
         } else {
             format!("{:>w$}", self.size, w = w.size_len)
         };
@@ -130,23 +131,44 @@ pub fn cmd_ls(args: &Vec<String>) {
         paths.push(".".to_string());
     }
 
-    let mut files = Vec::new();
+    let mut folders = Vec::new();
+    let mut simple_files = Vec::new();
 
-    for path in paths {
-        let path = Path::new(&path);
+    sort_paths(&mut paths);
+    for str_path in paths {
+        let mut files = Vec::new();
+        let path = Path::new(&str_path);
         if path.is_file() {
-            get_file_info(path, &options);
+            if let Some(file_info) = get_file_info(&path, &options).0 {
+            files.push(file_info);
+            }
+            simple_files.push((files, "".to_string(), 0));
         } else if path.is_dir() {
-            files.push(get_file_info(&PathBuf::from("."), &options));
-            files.push(get_file_info(&PathBuf::from(".."), &options));
+            let curr = get_file_info(&&PathBuf::from("."), &options);
+            let parent = get_file_info(&&PathBuf::from(".."), &options);
+            let mut blocks = 0;
 
+            if let Some(file_info) = curr.0 {
+                files.push(file_info);
+                if options.show_hidden {blocks += curr.1;}
+            }
+            if let Some(file_info) = parent.0 {
+                files.push(file_info);
+                if options.show_hidden {blocks += parent.1};
+            }
+
+             
             match fs::read_dir(path) {
                 Ok(entries) => {
                     entries.for_each(|entry| {
                         match entry {
                             Ok(entry) => {
                                 let path = entry.path();
-                                files.push(get_file_info(&path, &options));
+                                let file_infos = get_file_info(&path, &options);
+                                if let Some(file_info) = file_infos.0 {
+                                    files.push(file_info);
+                                    blocks += file_infos.1;
+                                }
                             },
                             Err(e) => println!("{e}")
                         }
@@ -154,27 +176,21 @@ pub fn cmd_ls(args: &Vec<String>) {
                 },
                 Err(e) => println!("{e}")
             };
+
+            folders.push((files, str_path, blocks));
         } else {
-            println!("ls: cannot access {}: No such file or directory", path.to_string_lossy())
+            println!("ls: cannot access '{}': No such file or directory", path.to_string_lossy())
         }
     }
-
-    files.sort_by(|a, b| {
-        if a.name == "." { return std::cmp::Ordering::Less; }
-        if b.name == "." { return std::cmp::Ordering::Greater; }
-        if a.name == ".." { return std::cmp::Ordering::Less; }
-        if b.name == ".." { return std::cmp::Ordering::Greater; }
-        a.name.trim_matches('.').to_lowercase().cmp(&b.name.trim_matches('.').to_lowercase())
-    });
-
+    // println!("{:#?}\n-----------------------------------------------------\n {:?}", paths_files_info, simple_files)
     if !options.show_long {
-        simple_print(&files, &options);
+        simple_print(&simple_files, &mut folders, &options);
     } else {
-        long_print(&files, options.show_hidden);
-    }
+        long_print(&simple_files, &mut folders, options.show_hidden);
+    } 
 }
 
-fn get_file_info(path: &Path, options: &LsOptions) -> FileInfo {
+fn get_file_info(path: &Path, options: &LsOptions) -> (Option<FileInfo>, u64) {
     let mut file_info = FileInfo {
         name: "".to_string(),
         typee: Unknown,
@@ -189,17 +205,17 @@ fn get_file_info(path: &Path, options: &LsOptions) -> FileInfo {
     };
     
     match fs::symlink_metadata(path) {
-        
         Ok(meta) => {
             let mode = meta.permissions().mode();
             let mut name  = get_file_name(&path);
             // add suffix to display name depend on type and flags
             let f_type = get_file_type(mode);
             classify_name(&mut name, options, &f_type, path);
+            let blocks = meta.blocks();
 
             file_info.name = name;
             if !options.show_long {
-                return file_info;
+                return (Some(file_info), blocks);
             }
 
             file_info.premession = get_permissions(mode, &f_type);
@@ -219,9 +235,9 @@ fn get_file_info(path: &Path, options: &LsOptions) -> FileInfo {
 
             
             // println!("{}",premession);
-            file_info
+            (Some(file_info), blocks)
         },
-        Err(_) => file_info
+        Err(_) => (None, 0)
     }
 }
 
@@ -281,7 +297,7 @@ fn classify_name(name: &mut String, options: &LsOptions, f_type: &FileType, path
         if f_type == &Symlink && options.show_long {
             let final_target = fs::canonicalize(path).unwrap_or( PathBuf::from(""));
             let next = fs::read_link(path).unwrap_or( PathBuf::from(""));
-            let t_name = get_file_name(&next);
+            let t_name = next.to_string_lossy().to_string();
             let mut s = String::from(" -> ");
             s.push_str(&t_name);
             match fs::metadata(final_target) {
@@ -326,70 +342,151 @@ fn get_mod_time(meta: &Metadata) -> String {
     }
 }
 
-fn simple_print(files:  &Vec<FileInfo>, options: &LsOptions) {
+fn simple_print(files:  &Vec<(Vec<FileInfo>, String, u64)>, folders: &mut Vec<(Vec<FileInfo>, String, u64)>, options: &LsOptions) {
     files.iter().for_each(|f| {
-        if options.show_hidden {
-            print!("{}  ", f.name.trim())
-        } else if !f.name.starts_with('.') {
-            print!("{}  ", f.name.trim())
-        }
-    });
-    println!()
-}
-
-fn long_print(files: &Vec<FileInfo>, show_hidden: bool) {
-    let mut format = LFormat::new();
-    files.iter().for_each(|f| {
-        let nlink_str = f.nlink.to_string();
-        let size_str = f.size.to_string();
-
-        if nlink_str.len() > format.nlink_len {
-            format.nlink_len = nlink_str.len()
-        }
-
-        if f.user.len() > format.user_len {
-            format.user_len = f.user.len()
-        }
-
-        if f.group.len() > format.group_len {
-            format.group_len = f.group.len()
-        }
-
-        if size_str.len() > format.size_len {
-            format.size_len = size_str.len()
-        }
-
-        if f.mod_date.len() > format.date_len {
-            format.date_len = f.mod_date.len();
-        }
-
-        match f.major {
-            Some(v) => {
-                let v = v.to_string();
-                if v.len() > format.major_len {
-                    format.major_len = v.len()
-                }
-            },
-            None => ()
-        }
-
-        match f.minor {
-            Some(v) => {
-                let v = v.to_string();
-                if v.len() > format.minor_len {
-                    format.minor_len = v.len()
-                }
-            },
-            None => ()
-        }
+        f.0.iter().for_each(|info| {
+            print!("{}  ", info.name.trim())
+        });
     });
 
-    files.iter().for_each(|f| {
-        if show_hidden {
-            f.print_long(&format);
-        } else if !f.name.starts_with('.') {
-            f.print_long(&format);
+    if files.len() != 0 {
+        println!()
+    }
+
+    if folders.len() > 0 && files.len() > 0 {
+        println!()
+    }
+
+    let folders_len = folders.len();
+    let print_name = folders_len > 1 || files.len() > 0;
+    folders.iter_mut().enumerate().for_each(|(i, f)| {
+        if print_name {
+            println!("{}:", f.1)
         }
-    })
+        sort_file_infos(&mut f.0);
+        let mut c = 0;
+        f.0.iter().for_each(|f| {
+            if options.show_hidden {
+                c += 1;
+                print!("{}  ", f.name.trim())
+            } else if !f.name.starts_with('.') {
+                c += 1;
+                print!("{}  ", f.name.trim())
+            }
+        });
+        if c != 0 {
+            println!();
+        }
+
+        if folders_len > 1 && i != folders_len -1 {
+            println!()
+        }
+    });
+    
 }
 
+fn long_print(files: &Vec<(Vec<FileInfo>, String, u64)>, folders: &mut Vec<(Vec<FileInfo>, String, u64)>, show_hidden: bool) {
+    let mut format_r = LFormat::new();
+    get_columns_maxes(&files, &mut format_r);
+    get_columns_maxes(&folders, &mut format_r);
+
+    files.iter().for_each(|v| {
+        v.0.iter().for_each(|v| {
+            v.print_long(&format_r);
+        });
+    });
+
+    if folders.len() > 0 && files.len() > 0 {
+        println!()
+    }
+
+    let folders_len = folders.len();
+    let print_name = folders_len > 1 || files.len() > 0;
+    folders.iter_mut().enumerate().for_each(|(i, f)| {
+        if print_name {
+            println!("{}:", f.1)
+        }
+        sort_file_infos(&mut f.0);
+        println!("total {}",f.2 / 2);
+        f.0.iter().for_each(|f| {
+            if show_hidden {
+                f.print_long(&format_r);
+            } else if !f.name.starts_with('.') {
+                f.print_long(&format_r);
+            }
+        });
+
+        if folders_len > 1 && i != folders_len -1 {
+            println!()
+        }
+    });
+}
+
+fn sort_paths(paths: &mut Vec<String>) {
+    paths.sort_by(|a, b| {
+        if a == "." { return std::cmp::Ordering::Less; }
+        if b == "." { return std::cmp::Ordering::Greater; }
+        if a == ".." { return std::cmp::Ordering::Less; }
+        if b == ".." { return std::cmp::Ordering::Greater; }
+        a.trim_matches('.').to_lowercase().cmp(&b.trim_matches('.').to_lowercase())
+    });
+}
+
+fn sort_file_infos(files: &mut Vec<FileInfo>) {
+    files.sort_by(|a, b| {
+        if a.name == "." { return std::cmp::Ordering::Less; }
+        if b.name == "." { return std::cmp::Ordering::Greater; }
+        if a.name == ".." { return std::cmp::Ordering::Less; }
+        if b.name == ".." { return std::cmp::Ordering::Greater; }
+        a.name.trim_matches('.').to_lowercase().cmp(&b.name.trim_matches('.').to_lowercase())
+    });
+}
+
+fn get_columns_maxes(files: &Vec<(Vec<FileInfo>, String, u64)>, format: &mut LFormat) {
+    files.iter().for_each(|v| {
+        v.0.iter().for_each(|v| {
+            let nlink_str = v.nlink.to_string();
+            let size_str = v.size.to_string();
+
+            if nlink_str.len() > format.nlink_len {
+                format.nlink_len = nlink_str.len()
+            }
+
+            if v.user.len() > format.user_len {
+                format.user_len = v.user.len()
+            }
+
+            if v.group.len() > format.group_len {
+                format.group_len = v.group.len()
+            }
+
+            if size_str.len() > format.size_len {
+                format.size_len = size_str.len()
+            }
+
+            if v.mod_date.len() > format.date_len {
+                format.date_len = v.mod_date.len();
+            }
+
+            match v.major {
+                Some(v) => {
+                    let v = v.to_string();
+                    if v.len() > format.major_len {
+                        format.major_len = v.len()
+                    }
+                },
+                None => ()
+            }
+
+            match v.minor {
+                Some(v) => {
+                    let v = v.to_string();
+                    if v.len() > format.minor_len {
+                        format.minor_len = v.len()
+                    }
+                },
+                None => ()
+            }
+        });
+    });
+}
