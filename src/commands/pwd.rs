@@ -1,12 +1,30 @@
 use std::env::current_dir;
+use std::path::PathBuf;
+
+static mut LAST_KNOWN_DIR: Option<PathBuf> = None;
 
 pub fn cmd_pwd() {
     match current_dir() {
         Ok(path) => {
-            println!("{}",path.display());
+            unsafe {
+                LAST_KNOWN_DIR = Some(path.clone());
+            }
+            println!("{}", path.display());
         },
         Err(_) => {
-            println!("\x1b[31mpwd\x1b[0m: Error getting current directory");
+            unsafe {
+                if let Some(ref last_path) = LAST_KNOWN_DIR {
+                    println!("{}", last_path.display());
+                } else {
+                    println!("/");
+                }
+            }
         }
+    }
+}
+
+pub fn update_last_known_dir(path: PathBuf) {
+    unsafe {
+        LAST_KNOWN_DIR = Some(path);
     }
 }

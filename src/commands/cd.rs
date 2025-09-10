@@ -46,6 +46,11 @@ pub fn cmd_cd(args: &Vec<Arg>, previous: &mut Option<PathBuf>) {
     match set_current_dir(&path) {
         Ok(_) => {
             *previous = current;
+            if let Ok(new_dir) = current_dir() {
+                unsafe {
+                    crate::CURRENT_TRACKED_DIR = Some(new_dir);
+                }
+            }
         }
         Err(e) => println!(
             "\x1b[33mcd\x1b[0m: {}: \"{}\"",

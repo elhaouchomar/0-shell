@@ -1,27 +1,30 @@
-use std::env;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-pub fn display_prompt(multi_line: bool) {
+pub fn display_prompt(multi_line: bool, current_path: &PathBuf) {
     if multi_line {
         print!("> ");
         io::stdout().flush().unwrap();
-        return
+        return;
     }
 
-    let path = env::current_dir().unwrap_or(PathBuf::new());
     let mut home_dir = PathBuf::new();
     
     match get_home_dir() {
         Some(dir) => home_dir = dir,
-        None => print!("err geting home path")
+        None => {
+            print!("err getting home path");
+            io::stdout().flush().unwrap();
+            return;
+        }
     };
 
-    let mut prompt_path = PathBuf::new();
-    if path.starts_with(&home_dir) {
-        let path_sufix = path.strip_prefix(&home_dir).unwrap();
-        prompt_path = PathBuf::from("~");
-        prompt_path.push(path_sufix);
+    let mut prompt_path = current_path.clone();
+    if current_path.starts_with(&home_dir) {
+        if let Ok(path_suffix) = current_path.strip_prefix(&home_dir) {
+            prompt_path = PathBuf::from("~");
+            prompt_path.push(path_suffix);
+        }
     }
 
     print!("\x1b[38;5;33m{}\x1b[0m$ ", prompt_path.display());
@@ -31,11 +34,11 @@ pub fn display_prompt(multi_line: bool) {
 pub fn get_home_dir() -> Option<PathBuf> {
     #[cfg(unix)]
     {
-        env::var_os("HOME").map(PathBuf::from)
+        std::env::var_os("HOME").map(PathBuf::from)
     }
 
     #[cfg(windows)]
     {
-        env::var_os("USERPROFILE").map(PathBuf::from)
+        std::env::var_os("USERPROFILE").map(PathBuf::from)
     }
 }
