@@ -13,7 +13,7 @@ fn main() {
         CURRENT_TRACKED_DIR = Some(current_dir.clone());
     }
     commands::pwd::update_last_known_dir(current_dir);
-    
+
     let mut input = String::new();
     let mut multi_line = false;
     let mut previous_dir: Option<PathBuf> = None;
@@ -27,7 +27,7 @@ fn main() {
         let current_path = unsafe {
             CURRENT_TRACKED_DIR.clone().unwrap_or_else(|| PathBuf::from("/"))
         };
-        
+
         utils::prompt::display_prompt(multi_line, &current_path);
 
         input += &utils::input::get_input();
@@ -44,6 +44,10 @@ fn main() {
         let command = utils::parser::pasre_input(&input);
 
         match command.name.as_str() {
+            "" => {
+                print!("");
+                continue;
+            }
             "pwd" => {
                 commands::pwd::cmd_pwd();
             }
@@ -68,6 +72,12 @@ fn main() {
             }
             "cat" => {
                 commands::cat::cmd_cat(&command.args);
+            }
+            "mkdir" => {
+                commands::mkdir::cmd_mkdir(&command.args);
+            }
+            "cp" => {
+                commands::cp::cmd_cp(&command.args);
             }
             _ => println!("\x1b[33m{}\x1b[0m: Command not found", command.name),
         }
