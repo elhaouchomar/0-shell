@@ -10,7 +10,7 @@ pub struct Arg {
     pub quoted: bool,
 }
 
-pub fn pasre_input(input: &str) -> Command {
+pub fn parse_input(input: &str) -> Command {
     let mut command = Command {
         name : String::new(),
         args : Vec::new(),

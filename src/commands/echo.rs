@@ -26,7 +26,7 @@ pub fn cmd_echo(args: &Vec<Arg>) {
 }
 
 
-fn handle_escapes(input: &str) -> String {
+pub fn handle_escapes(input: &str) -> String {
     let mut result = String::new();
     let mut chars = input.chars();
     let mut count = 0;
