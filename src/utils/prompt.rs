@@ -8,16 +8,7 @@ pub fn display_prompt(multi_line: bool, current_path: &PathBuf) {
         return;
     }
 
-    let mut home_dir = PathBuf::new();
-    
-    match get_home_dir() {
-        Some(dir) => home_dir = dir,
-        None => {
-            print!("err getting home path");
-            io::stdout().flush().unwrap();
-            return;
-        }
-    };
+    let home_dir = get_home_dir().unwrap_or_else(|| PathBuf::from("/"));
 
     let mut prompt_path = current_path.clone();
     if current_path.starts_with(&home_dir) {

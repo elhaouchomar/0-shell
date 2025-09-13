@@ -1,5 +1,5 @@
-use crate::utils::prompt::get_home_dir;
 use crate::utils::parser::Arg;
+use crate::utils::prompt::get_home_dir;
 
 pub fn cmd_echo(args: &Vec<Arg>) {
     let mut output_parts = Vec::new();
@@ -19,12 +19,11 @@ pub fn cmd_echo(args: &Vec<Arg>) {
                 output_parts.push(arg.value.clone())
             }
         } else {
-            output_parts.push(handle_escapes(&arg.value));
+            output_parts.push(arg.value.clone());
         }
     }
     println!("{}", output_parts.join(" "));
 }
-
 
 pub fn handle_escapes(input: &str) -> String {
     let mut result = String::new();
