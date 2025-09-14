@@ -5,12 +5,13 @@ use libc::{major, minor};
 use std::fs::{self, Metadata};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::PathBuf;
+use crate::utils::parser::Arg;
 
-// struct LsOptions {
-//     show_hidden: bool,
-//     show_long: bool,
-//     show_suffix: bool,
-// }
+struct LsOptions {
+    show_hidden: bool,
+    show_long: bool,
+    show_suffix: bool,
+}
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum FileType {
@@ -95,19 +96,37 @@ impl FileInfo {
     }
 }
 
-pub fn cmd_ls(args: &Vec<String>) {
+pub fn cmd_ls(args: &Vec<Arg>) {
     let mut options = LsOptions {
         show_hidden: false,
         show_long: false,
         show_suffix: false,
     };
 
-// pub fn cmd_ls(args: &Vec<Arg>) {
-//     let mut options = LsOptions {
-//         show_hidden: false,
-//         show_long: false,
-//         show_suffix: false,
-//     };
+    let mut paths = Vec::new();
+    for arg in args {
+        if arg.value.starts_with('-') {
+            for c in arg.value.chars().skip(1) {
+                match c {
+                    'l' => {
+                        options.show_long = true;
+                    },
+                    'a' => {
+                        options.show_hidden = true;
+                    },
+                    'F' => {
+                        options.show_suffix = true;
+                    },
+                    _ => {
+                        println!("\x1b[33mls\x1b[0m: Not a valid option {}", arg.value);
+                        return
+                    }
+                }
+            }
+        } else {
+            paths.push(arg.value.to_string())
+        }
+    }
 
     if paths.is_empty() {
         paths.push(".".to_string());
