@@ -51,6 +51,15 @@ fn main() {
 
         match command.name.as_str() {
             "cat" => commands::cat::cmd_cat(&command.args),
+            "ls" => {
+                commands::ls::cmd_ls(&command.args);
+            },
+            "pwd" => {
+                commands::pwd::cmd_pwd();
+            },
+            "echo" => {
+                commands::echo::cmd_echo(&command.args);
+            },
             "cd" => {
                 commands::cd::cmd_cd(&command.args, &mut previous_dir);
                 if let Ok(current_dir) = env::current_dir() {
