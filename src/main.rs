@@ -79,6 +79,12 @@ fn main() {
             "cp" => {
                 commands::cp::cmd_cp(&command.args);
             }
+            "rm" => {
+                commands::rm::cmd_rm(&command.args);
+            }
+            "mv" => {
+                commands::mv::cmd_mv(&command.args);
+            }
             _ => println!("\x1b[33m{}\x1b[0m: Command not found", command.name),
         }
     }
