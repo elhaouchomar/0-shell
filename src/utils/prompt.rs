@@ -27,7 +27,11 @@ pub fn display_prompt(multi_line: bool, current_path: &PathBuf) {
         }
     }
 
-    print!("\x1b[38;5;33m{}\x1b[0m$ ", prompt_path.display());
+    // Path = bold blue, $ = bold red
+    print!(
+        "\x1b[1;38;5;33m{}\x1b[0m\x1b[1;31m$\x1b[0m ",
+        prompt_path.display()
+    );
     io::stdout().flush().unwrap();
 }
 
