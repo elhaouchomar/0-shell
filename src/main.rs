@@ -51,29 +51,26 @@ fn main() {
         }
 
         match command.name.as_str() {
-            "pwd" => {
-                commands::pwd::cmd_pwd();
-            },
-            "echo" => {
-                commands::echo::cmd_echo(&command.args);
-            },
+            "cat" => commands::cat::cmd_cat(&command.args),
             "cd" => {
                 commands::cd::cmd_cd(&command.args, &mut previous_dir);
                 if let Ok(current_dir) = env::current_dir() {
                     unsafe { CURRENT_TRACKED_DIR = Some(current_dir.clone()) }
                     commands::pwd::update_last_known_dir(current_dir);
                 }
-            }
-            "exit" => {
-                commands::exit::cmd_exit();
-            }
-            "clear" => {
-                commands::clear::cmd_clear();
-            }
-            "cat" => {
-                commands::cat::cmd_cat(&command.args);
-            }
+            },
+            "clear" => commands::clear::cmd_clear(),
+            "cp" => commands::cp::cmd_cp(&command.args),
+            "echo" => commands::echo::cmd_echo(&command.args),
+            "exit" => commands::exit::cmd_exit(),
+            "ls" => commands::ls::cmd_ls(&command.args),
+            "mkdir" => commands::mkdir::cmd_mkdir(&command.args),
+            // "rm" => commands::rm::cmd_rm(&command.args),
+            // "mv" => commands::mv::cmd_mv(&command.args),
+            "pwd" => commands::pwd::cmd_pwd(),
             _ => println!("\x1b[33m{}\x1b[0m: Command not found", command.name),
         }
     }
 }
+
+
