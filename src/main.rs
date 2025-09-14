@@ -23,6 +23,7 @@ fn main() {
         let current_path = unsafe {
             CURRENT_TRACKED_DIR.clone().unwrap_or_else(|| PathBuf::from("/"))
         };
+        
         utils::prompt::display_prompt(multi_line, &current_path);
 
         input += &utils::parser::get_input();
@@ -50,10 +51,6 @@ fn main() {
         }
 
         match command.name.as_str() {
-            "cat" => commands::cat::cmd_cat(&command.args),
-            "ls" => {
-                commands::ls::cmd_ls(&command.args);
-            },
             "pwd" => {
                 commands::pwd::cmd_pwd();
             },
@@ -67,14 +64,16 @@ fn main() {
                     commands::pwd::update_last_known_dir(current_dir);
                 }
             }
-            "clear" => commands::clear::cmd_clear(),
-            "echo" => commands::echo::cmd_echo(&command.args),
-            "exit" => commands::exit::cmd_exit(),
-            "pwd" => commands::pwd::cmd_pwd(),
-            _ if !command.name.is_empty() => {
-                println!("\x1b[33m{}\x1b[0m: Command not found", command.name)
+            "exit" => {
+                commands::exit::cmd_exit();
             }
-            _ => {}
+            "clear" => {
+                commands::clear::cmd_clear();
+            }
+            "cat" => {
+                commands::cat::cmd_cat(&command.args);
+            }
+            _ => println!("\x1b[33m{}\x1b[0m: Command not found", command.name),
         }
     }
 }

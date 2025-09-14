@@ -10,7 +10,7 @@ pub fn cmd_pwd() {
                 LAST_KNOWN_DIR = Some(path.clone());
             }
             println!("{}", path.display());
-        },
+        }
         Err(_) => {
             unsafe {
                 if let Some(ref last_path) = LAST_KNOWN_DIR {

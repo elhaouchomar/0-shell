@@ -16,7 +16,7 @@ pub fn cmd_echo(args: &Vec<Arg>) {
                 let expanded = format!("{}/{}", home.display(), &arg.value[2..]);
                 output_parts.push(expanded);
             } else {
-                output_parts.push(arg.value.clone())
+                output_parts.push(arg.value.clone());
             }
         } else {
             output_parts.push(arg.value.clone());
@@ -41,18 +41,18 @@ pub fn handle_escapes(input: &str) -> String {
                 Some('f') => {
                     result.push('\n');
                     result.push_str(&" ".repeat(count));
-                },
+                }
                 Some('v') => result.push_str("\n\n\n\n"),
                 Some(c) => {
                     result.push('\\');
                     result.push(c);
-                },
-                None => result.push('\\')
+                }
+                None => result.push('\\'),
             }
         } else {
-            result.push(c)
+            result.push(c);
         }
-        count += 1
+        count += 1;
     }
 
     result
