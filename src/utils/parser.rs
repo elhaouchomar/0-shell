@@ -3,6 +3,12 @@ pub struct Command {
     pub name: String,
     pub args: Vec<String>
 }
+#[derive(Debug)]
+pub struct Arg {
+    pub value: String,
+    pub quoted: bool,
+}
+
 
 pub fn pasre_input(input: &str) -> Command {
     let mut command = Command {

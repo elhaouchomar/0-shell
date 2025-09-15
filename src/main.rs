@@ -1,5 +1,6 @@
 mod utils;
 mod commands;
+use crate::utils::parser::Arg;
 
 
 fn main() {
@@ -43,6 +44,29 @@ fn main() {
             },
             "clear" => {
                 commands::clear::cmd_clear()
+            },
+               "mkdir" => {
+                commands::mkdir::cmd_mkdir(&command.args)
+            },
+                 "rm" => {
+           let args =  &command.args.iter().map(|x| {
+            let kk = Arg {
+                value : x.to_string(),
+                quoted : false
+            };
+            return  kk;
+           } ).collect();
+                commands::rm::cmd_rm(&args)
+            },
+                 "mv" => {
+           let args =  &command.args.iter().map(|x| {
+            let kk = Arg {
+                value : x.to_string(),
+                quoted : false
+            };
+            return  kk;
+           } ).collect();
+                commands::mv::cmd_mv(&args)
             }
             _ => println!("\x1b[33m{}\x1b[0m: Command not found", command.name)
         }
