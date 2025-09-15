@@ -1,8 +1,7 @@
 use crate::utils::parser::Arg;
 use crate::utils::prompt::get_home_dir;
-use std::env::{current_dir, set_current_dir, var};
-use std::path::{Path, PathBuf};
-use std::io;
+use std::env::{current_dir, set_current_dir};
+use std::path::PathBuf;
 
 pub fn cmd_cd(args: &[Arg], previous: &mut Option<PathBuf>) {
     if args.len() > 1 {
@@ -17,8 +16,7 @@ pub fn cmd_cd(args: &[Arg], previous: &mut Option<PathBuf>) {
             match get_home_dir() {
                 Some(dir) => dir,
                 None => {
-                    eprintln!("cd: HOME not set");
-                    return;
+                    current.clone().unwrap_or_else(|| PathBuf::from("/"))
                 }
             }
         }
@@ -31,8 +29,12 @@ pub fn cmd_cd(args: &[Arg], previous: &mut Option<PathBuf>) {
                             prev.clone()
                         }
                         None => {
-                            eprintln!("cd: OLDPWD not set");
-                            return;
+                            if let Some(ref cur) = current {
+                                println!("{}", cur.display());
+                                cur.clone()
+                            } else {
+                                PathBuf::from("/")
+                            }
                         }
                     }
                 }
@@ -40,8 +42,7 @@ pub fn cmd_cd(args: &[Arg], previous: &mut Option<PathBuf>) {
                     match get_home_dir() {
                         Some(dir) => dir,
                         None => {
-                            eprintln!("cd: HOME not set");
-                            return;
+                            current.clone().unwrap_or_else(|| PathBuf::from("/"))
                         }
                     }
                 }
@@ -49,8 +50,29 @@ pub fn cmd_cd(args: &[Arg], previous: &mut Option<PathBuf>) {
                     match get_home_dir() {
                         Some(home) => home.join(&path[2..]),
                         None => {
-                            eprintln!("cd: HOME not set");
-                            return;
+                            current.clone().unwrap_or_else(|| PathBuf::from("/"))
+                        }
+                    }
+                }
+                ".." => {
+                    match current_dir() {
+                        Ok(current_path) => {
+                            match current_path.parent() {
+                                Some(parent) => parent.to_path_buf(),
+                                None => PathBuf::from("/")
+                            }
+                        }
+                        Err(_) => {
+                            unsafe {
+                                if let Some(ref tracked) = crate::CURRENT_TRACKED_DIR {
+                                    match tracked.parent() {
+                                        Some(parent) => parent.to_path_buf(),
+                                        None => PathBuf::from("/")
+                                    }
+                                } else {
+                                    PathBuf::from("/")
+                                }
+                            }
                         }
                     }
                 }
@@ -71,26 +93,8 @@ pub fn cmd_cd(args: &[Arg], previous: &mut Option<PathBuf>) {
                 }
             }
         }
-        Err(e) => {
-            match e.kind() {
-                io::ErrorKind::NotFound => {
-                    eprintln!("cd: {}: No such file or directory", target_path.display());
-                }
-                io::ErrorKind::PermissionDenied => {
-                    eprintln!("cd: {}: Permission denied", target_path.display());
-                }
-                _ => {
-                    if target_path.exists() {
-                        if target_path.is_file() {
-                            eprintln!("cd: {}: Not a directory", target_path.display());
-                        } else {
-                            eprintln!("cd: {}: {}", target_path.display(), e);
-                        }
-                    } else {
-                        eprintln!("cd: {}: No such file or directory", target_path.display());
-                    }
-                }
-            }
+        Err(_) => {
+            eprintln!("cd: can't cd to {}", target_path.display());
         }
     }
 }
