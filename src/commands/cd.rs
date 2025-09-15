@@ -4,14 +4,20 @@ use std::env::{current_dir, set_current_dir};
 use std::path::PathBuf;
 
 pub fn cmd_cd(args: &[Arg], previous: &mut Option<PathBuf>) {
-    if args.len() > 1 {
+    let processed_args = if args.len() > 0 && args[0].value == "--" {
+        &args[1..]
+    } else {
+        args
+    };
+
+    if processed_args.len() > 1 {
         eprintln!("cd: too many arguments");
         return;
     }
 
     let current = current_dir().ok();
 
-    let target_path = match args.get(0) {
+    let target_path = match processed_args.get(0) {
         None => {
             match get_home_dir() {
                 Some(dir) => dir,
