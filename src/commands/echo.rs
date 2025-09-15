@@ -27,33 +27,33 @@ pub fn cmd_echo(args: &Vec<Arg>) {
 
 pub fn handle_escapes(input: &str) -> String {
     let mut result = String::new();
-    let mut chars = input.chars();
-    let mut count = 0;
+    let mut chars = input.chars().peekable();
 
     while let Some(c) = chars.next() {
         if c == '\\' {
-            match chars.next() {
-                Some('n') => result.push('\n'),
-                Some('t') => result.push('\t'),
-                Some('\'') => result.push('\''),
-                Some('"') => result.push('\"'),
-                Some('\\') => result.push('\\'),
-                Some('f') => {
-                    result.push('\n');
-                    result.push_str(&" ".repeat(count));
-                }
-                Some('v') => result.push_str("\n\n\n\n"),
-                Some(c) => {
+            match chars.peek() {
+                Some('n') => { chars.next(); result.push('\n'); }
+                Some('r') => { chars.next(); result.push('\r'); }
+                Some('t') => { chars.next(); result.push('\t'); }
+                Some('\'') => { chars.next(); result.push('\''); }
+                Some('"') => { chars.next(); result.push('\"'); }
+                Some('\\') => { chars.next(); result.push('\\'); }
+                Some('a') => { chars.next(); result.push('\x07'); }
+                Some('b') => { chars.next(); result.push('\x08'); }
+                Some('f') => { chars.next(); result.push('\x0C'); }
+                Some('v') => { chars.next(); result.push_str("\n\n\n\n");}
+
+                Some(other) => {
                     result.push('\\');
-                    result.push(c);
+                    result.push(*other);
+                    chars.next();
                 }
                 None => result.push('\\'),
             }
         } else {
             result.push(c);
         }
-        count += 1;
     }
 
     result
-} 
+}

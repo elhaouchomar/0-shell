@@ -1,66 +1,96 @@
 use crate::utils::parser::Arg;
 use crate::utils::prompt::get_home_dir;
-use std::env::{ current_dir, set_current_dir };
-use std::path::PathBuf;
+use std::env::{current_dir, set_current_dir, var};
+use std::path::{Path, PathBuf};
+use std::io;
 
-pub fn cmd_cd(args: &Vec<Arg>, previous: &mut Option<PathBuf>) {
+pub fn cmd_cd(args: &[Arg], previous: &mut Option<PathBuf>) {
     if args.len() > 1 {
-        println!("\x1b[33mcd\x1b[0m: too many arguments");
+        eprintln!("cd: too many arguments");
         return;
     }
 
     let current = current_dir().ok();
 
-    let path: String = match args.get(0) {
-        None =>
+    let target_path = match args.get(0) {
+        None => {
             match get_home_dir() {
-                Some(dir) => dir.to_str().unwrap().to_string(),
-                None => "~".to_string(),
+                Some(dir) => dir,
+                None => {
+                    eprintln!("cd: HOME not set");
+                    return;
+                }
             }
-        Some(arg) =>
-            match (arg.value.as_str(), arg.quoted) {
-                ("-", _) => {
+        }
+        Some(arg) => {
+            match arg.value.as_str() {
+                "-" => {
                     match previous {
                         Some(prev) => {
-                            let p = prev.to_str().unwrap().to_string();
-                            println!("{}", p);
-                            p
+                            println!("{}", prev.display());
+                            prev.clone()
                         }
                         None => {
-                            println!("{}", current_dir().unwrap().to_str().unwrap());
+                            eprintln!("cd: OLDPWD not set");
                             return;
                         }
                     }
                 }
-
-                ("~", false) =>
+                "~" if !arg.quoted => {
                     match get_home_dir() {
-                        Some(dir) => dir.to_str().unwrap().to_string(),
-                        None => "~".to_string(),
+                        Some(dir) => dir,
+                        None => {
+                            eprintln!("cd: HOME not set");
+                            return;
+                        }
                     }
-                (val, false) if val.starts_with("~/") =>
+                }
+                path if path.starts_with("~/") && !arg.quoted => {
                     match get_home_dir() {
-                        Some(dir) => format!("{}/{}", dir.to_str().unwrap(), &val[2..]),
-                        None => val.to_string(),
+                        Some(home) => home.join(&path[2..]),
+                        None => {
+                            eprintln!("cd: HOME not set");
+                            return;
+                        }
                     }
-                (val, _) => val.to_string(),
+                }
+                path => {
+                    PathBuf::from(path)
+                }
             }
+        }
     };
 
-    match set_current_dir(&path) {
+    match set_current_dir(&target_path) {
         Ok(_) => {
             *previous = current;
+            
             if let Ok(new_dir) = current_dir() {
                 unsafe {
                     crate::CURRENT_TRACKED_DIR = Some(new_dir);
                 }
             }
         }
-        Err(e) =>
-            println!(
-                "\x1b[33mcd\x1b[0m: {}: \"{}\"",
-                e.to_string().split(" (os error").next().unwrap(),
-                path
-            ),
+        Err(e) => {
+            match e.kind() {
+                io::ErrorKind::NotFound => {
+                    eprintln!("cd: {}: No such file or directory", target_path.display());
+                }
+                io::ErrorKind::PermissionDenied => {
+                    eprintln!("cd: {}: Permission denied", target_path.display());
+                }
+                _ => {
+                    if target_path.exists() {
+                        if target_path.is_file() {
+                            eprintln!("cd: {}: Not a directory", target_path.display());
+                        } else {
+                            eprintln!("cd: {}: {}", target_path.display(), e);
+                        }
+                    } else {
+                        eprintln!("cd: {}: No such file or directory", target_path.display());
+                    }
+                }
+            }
+        }
     }
 }
