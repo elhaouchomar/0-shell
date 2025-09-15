@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use users::{get_user_by_uid, get_group_by_gid};
 use terminal_size::{terminal_size, Width};
 
-pub fn get_file_info(path: &Path, options: &LsFlags) -> (Option<FileInfo>, u64) {
+pub fn get_file_info(path: &Path, options: &LsFlags, name: &str) -> (Option<FileInfo>, u64) {
     let mut file_info = FileInfo {
         name: "".to_string(),
         typee: FileType::Unknown,
@@ -26,7 +26,7 @@ pub fn get_file_info(path: &Path, options: &LsFlags) -> (Option<FileInfo>, u64) 
     match fs::symlink_metadata(path) {
         Ok(meta) => {
             let mode = meta.permissions().mode();
-            let mut name  = get_file_name(&path);
+            let mut name  = if name.is_empty() {get_file_name(&path)} else {name.to_string()};
             let f_type = get_file_type(mode);
             classify_name(&mut name, options, &f_type, path);
             let blocks = meta.blocks();

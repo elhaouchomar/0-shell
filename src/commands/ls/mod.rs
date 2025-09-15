@@ -5,9 +5,10 @@ use structs::LsFlags;
 use std::path::PathBuf;
 use std::path::Path;
 use std::fs;
+use crate::utils::parser::Arg;
 
 
-pub fn cmd_ls(args: &Vec<String>) {
+pub fn cmd_ls(args: &Vec<Arg>) {
     let mut options = LsFlags {
         show_hidden: false,
         show_long: false,
@@ -16,8 +17,8 @@ pub fn cmd_ls(args: &Vec<String>) {
 
     let mut paths = Vec::new();
     for arg in args {
-        if arg.starts_with('-') {
-            for c in arg.chars().skip(1) {
+        if arg.value.starts_with('-') {
+            for c in arg.value.chars().skip(1) {
                 match c {
                     'l' => {
                         options.show_long = true;
@@ -29,13 +30,13 @@ pub fn cmd_ls(args: &Vec<String>) {
                         options.show_suffix = true;
                     },
                     _ => {
-                        println!("\x1b[33mls\x1b[0m: Not a valid option {}", arg);
+                        println!("\x1b[33mls\x1b[0m: Not a valid option {}", arg.value);
                         return
                     }
                 }
             }
         } else {
-            paths.push(arg.to_string())
+            paths.push(arg.value.to_string())
         }
     }
 
@@ -49,15 +50,15 @@ pub fn cmd_ls(args: &Vec<String>) {
     sort_paths(&mut paths);
     for str_path in paths {
         let mut files = Vec::new();
-        let path = Path::new(&str_path);
-        if path.is_file() {
-            if let Some(file_info) = get_file_info(&path, &options).0 {
-            files.push(file_info);
-            }
-            simple_files.push((files, "".to_string(), 0));
-        } else if path.is_dir() {
-            let curr = get_file_info(&&PathBuf::from("."), &options);
-            let parent = get_file_info(&&PathBuf::from(".."), &options);
+        let path = PathBuf::from(&str_path);
+        if path.is_dir() {
+            let mut curr = path.clone();
+            let mut parrent = path.clone();
+            curr.push(".");
+            parrent.push("..");
+
+            let curr = get_file_info(&curr, &options, ".");
+            let parent = get_file_info(&parrent, &options, "..");
             let mut blocks = 0;
 
             if let Some(file_info) = curr.0 {
@@ -76,10 +77,12 @@ pub fn cmd_ls(args: &Vec<String>) {
                         match entry {
                             Ok(entry) => {
                                 let path = entry.path();
-                                let file_infos = get_file_info(&path, &options);
+                                let file_infos = get_file_info(&path, &options, "");
                                 if let Some(file_info) = file_infos.0 {
+                                    if options.show_hidden || !file_info.name.starts_with(".") {
+                                        blocks += file_infos.1;
+                                    }
                                     files.push(file_info);
-                                    blocks += file_infos.1;
                                 }
                             },
                             Err(e) => println!("{e}")
@@ -91,8 +94,14 @@ pub fn cmd_ls(args: &Vec<String>) {
 
             folders.push((files, str_path, blocks));
         } else {
-            println!("ls: cannot access '{}': No such file or directory", path.to_string_lossy())
-        }
+            if let Some(file_info) = get_file_info(&path, &options, "").0 {
+                files.push(file_info);
+                simple_files.push((files, "".to_string(), 0));
+            } else {
+                println!("ls: cannot access '{}': No such file or directory", path.to_string_lossy())
+            }
+            
+        } 
     }
     
 
