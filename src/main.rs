@@ -35,8 +35,6 @@ fn main() {
                 input.pop();
             }
             continue;
-        } else {
-            multi_line = false;
         }
 
         let raw_command = utils::parser::parse_input(&input);
