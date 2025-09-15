@@ -5,6 +5,7 @@ use libc::{major, minor};
 use std::fs::{self, Metadata};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::PathBuf;
+use crate::utils::parser::Arg;
 
 struct LsOptions {
     show_hidden: bool,
@@ -95,7 +96,7 @@ impl FileInfo {
     }
 }
 
-pub fn cmd_ls(args: &Vec<String>) {
+pub fn cmd_ls(args: &Vec<Arg>) {
     let mut options = LsOptions {
         show_hidden: false,
         show_long: false,
@@ -104,8 +105,8 @@ pub fn cmd_ls(args: &Vec<String>) {
 
     let mut paths = Vec::new();
     for arg in args {
-        if arg.starts_with('-') {
-            for c in arg.chars().skip(1) {
+        if arg.value.starts_with('-') {
+            for c in arg.value.chars().skip(1) {
                 match c {
                     'l' => {
                         options.show_long = true;
@@ -117,13 +118,13 @@ pub fn cmd_ls(args: &Vec<String>) {
                         options.show_suffix = true;
                     },
                     _ => {
-                        println!("\x1b[33mls\x1b[0m: Not a valid option {}", arg);
+                        println!("\x1b[33mls\x1b[0m: Not a valid option {}", arg.value);
                         return
                     }
                 }
             }
         } else {
-            paths.push(arg.to_string())
+            paths.push(arg.value.to_string())
         }
     }
 

@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::{ self, Write };
 use std::path::PathBuf;
 
 pub fn display_prompt(multi_line: bool, current_path: &PathBuf) {
@@ -9,15 +9,17 @@ pub fn display_prompt(multi_line: bool, current_path: &PathBuf) {
     }
 
     let mut home_dir = PathBuf::new();
-    
+
     match get_home_dir() {
-        Some(dir) => home_dir = dir,
+        Some(dir) => {
+            home_dir = dir;
+        }
         None => {
             print!("err getting home path");
             io::stdout().flush().unwrap();
             return;
         }
-    };
+    }
 
     let mut prompt_path = current_path.clone();
     if current_path.starts_with(&home_dir) {
@@ -28,10 +30,7 @@ pub fn display_prompt(multi_line: bool, current_path: &PathBuf) {
     }
 
     // Path = bold blue, $ = bold red
-    print!(
-        "\x1b[1;38;5;33m{}\x1b[0m\x1b[1;31m$\x1b[0m ",
-        prompt_path.display()
-    );
+    print!("\x1b[1;38;5;33m{}\x1b[0m\x1b[1;31m$\x1b[0m ", prompt_path.display());
     io::stdout().flush().unwrap();
 }
 

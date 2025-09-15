@@ -50,7 +50,7 @@ fn main() {
             }
             "ls" => {
                 commands::ls::cmd_ls(&command.args);
-            },
+            }
             "pwd" => {
                 commands::pwd::cmd_pwd();
             }
