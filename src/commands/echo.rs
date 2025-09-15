@@ -1,65 +1,29 @@
 use crate::utils::parser::Arg;
 use crate::utils::prompt::get_home_dir;
-use std::fs::File;
-use std::io::Write;
 
 pub fn cmd_echo(args: &Vec<Arg>) {
     let mut output_parts = Vec::new();
-    let mut redirect_to_file = None;
-    let mut i = 0;
 
-    // Find redirection operator
-    while i < args.len() {
-        if args[i].value == ">" && i + 1 < args.len() {
-            redirect_to_file = Some(&args[i + 1]);
-            break;
-        }
-        i += 1;
-    }
-
-    // Process arguments before redirection
-    let args_to_process = if redirect_to_file.is_some() { &args[..i] } else { args };
-
-    for arg in args_to_process {
-        let processed_value = if arg.value == "~" && !arg.quoted {
+    for arg in args {
+        if arg.value == "~" && !arg.quoted {
             if let Some(home) = get_home_dir() {
-                home.display().to_string()
+                output_parts.push(home.display().to_string());
             } else {
-                "~".to_string()
+                output_parts.push("~".to_string());
             }
         } else if arg.value.starts_with("~/") && !arg.quoted {
             if let Some(home) = get_home_dir() {
-                format!("{}/{}", home.display(), &arg.value[2..])
+                let expanded = format!("{}/{}", home.display(), &arg.value[2..]);
+                output_parts.push(expanded);
             } else {
-                arg.value.clone()
+                output_parts.push(arg.value.clone());
             }
         } else {
-            // Don't call handle_escapes here - it's already processed in main
-            arg.value.clone()
-        };
-        output_parts.push(processed_value);
-    }
-
-    let output = output_parts.join(" ");
-
-    // Handle output redirection
-    if let Some(file_arg) = redirect_to_file {
-        let filename = &file_arg.value;
-        match File::create(filename) {
-            Ok(mut file) => {
-                if let Err(e) = writeln!(file, "{}", output) {
-                    eprintln!("echo: error writing to file '{}': {}", filename, e);
-                }
-            }
-            Err(e) => {
-                eprintln!("echo: cannot create file '{}': {}", filename, e);
-            }
+            output_parts.push(arg.value.clone());
         }
-    } else {
-        println!("{}", output);
     }
+    println!("{}", output_parts.join(" "));
 }
-
 
 pub fn handle_escapes(input: &str) -> String {
     let mut result = String::new();

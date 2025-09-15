@@ -132,6 +132,9 @@ pub fn cmd_ls(args: &Vec<Arg>) {
         paths.push(".".to_string());
     }
 
+
+
+    
     let mut folders = Vec::new();
     let mut simple_files = Vec::new();
 

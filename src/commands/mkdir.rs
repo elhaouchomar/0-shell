@@ -8,6 +8,7 @@ pub fn cmd_mkdir(args: &[Arg]) {
         return;
     }
 
+
     for arg in args {
         let path = Path::new(arg.value.as_str());
 

@@ -4,7 +4,9 @@ use std::path::PathBuf;
 pub fn display_prompt(multi_line: bool, current_path: &PathBuf) {
     if multi_line {
         print!("> ");
-        io::stdout().flush().unwrap();
+        if io::stdout().flush().is_err(){
+            eprintln!("cannot read line");
+        };
         return;
     }
 
@@ -19,7 +21,9 @@ pub fn display_prompt(multi_line: bool, current_path: &PathBuf) {
     }
 
     print!("\x1b[38;5;33m{}\x1b[0m$ ", prompt_path.display());
-    io::stdout().flush().unwrap();
+   if io::stdout().flush().is_err(){
+        eprintln!("cannot read line")
+    };
 }
 
 pub fn get_home_dir() -> Option<PathBuf> {
