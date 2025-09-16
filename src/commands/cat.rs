@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{self, BufRead, BufReader, Read};
+use std::io::{self, BufReader, Read, Write, BufRead, BufWriter};
 use crate::utils::parser::Arg;
 
 pub fn cmd_cat(args: &[Arg]) {
@@ -40,7 +40,7 @@ pub fn cmd_cat(args: &[Arg]) {
     }
 
     if files_to_read.is_empty() && stdin_requests.is_empty() {
-        read_from_stdin_with_counter();
+        read_from_stdin();
         return;
     }
 
@@ -51,58 +51,61 @@ pub fn cmd_cat(args: &[Arg]) {
 
     for (_, item) in items {
         if item == "-" {
-            read_from_stdin_with_counter();
+            read_from_stdin();
         } else {
             read_file(item);
         }
     }
 }
 
-fn read_from_stdin_with_counter() {
-    static mut STDIN_COUNTER: i32 = 0;
-    
-    unsafe {
-        STDIN_COUNTER += 1;
-    }
-    
+fn read_from_stdin() {
     let stdin = io::stdin();
-    let mut handle = stdin.lock();
-    let mut buffer = String::new();
+    let stdout = io::stdout();
+    let mut stdout_lock = BufWriter::new(stdout.lock());
     
-    loop {
-        buffer.clear();
-        match handle.read_line(&mut buffer) {
-            Ok(0) => {
-                unsafe {
-                    STDIN_COUNTER -= 1;
-                    if STDIN_COUNTER <= 0 {
-                        break;
-                    } else {
-                        continue;
-                    }
+    for line_result in stdin.lock().lines() {
+        match line_result {
+            Ok(line) => {
+                if writeln!(stdout_lock, "{}", line).is_err() {
+                    eprintln!("cat: write error");
+                    break;
                 }
             }
-            Ok(_) => print!("{}", buffer),
             Err(e) => {
                 eprintln!("cat: stdin: {}", e);
-                unsafe {
-                    STDIN_COUNTER -= 1;
-                }
                 break;
             }
         }
     }
+    
+    let _ = stdout_lock.flush();
 }
 
 fn read_file(filename: &str) {
     match File::open(filename) {
         Ok(file) => {
             let mut reader = BufReader::new(file);
-            let mut buffer = String::new();
-            match reader.read_to_string(&mut buffer) {
-                Ok(_) => print!("{}", buffer),
-                Err(e) => eprintln!("cat: {}: {}", filename, e),
+            let stdout = io::stdout();
+            let mut stdout_lock = BufWriter::new(stdout.lock());
+            let mut buffer = [0u8; 8192]; 
+            
+            loop {
+                match reader.read(&mut buffer) {
+                    Ok(0) => break, 
+                    Ok(n) => {
+                        if stdout_lock.write_all(&buffer[..n]).is_err() {
+                            eprintln!("cat: write error");
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("cat: {}: {}", filename, e);
+                        break;
+                    }
+                }
             }
+            
+            let _ = stdout_lock.flush();
         }
         Err(e) => {
             match e.kind() {
