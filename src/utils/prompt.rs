@@ -1,4 +1,4 @@
-use std::io::{self, stdout, Stdout, Write};
+use std::io::{self, Write};
 use std::path::PathBuf;
 
 pub fn display_prompt(multi_line: bool, current_path: &PathBuf) {
@@ -22,5 +22,5 @@ pub fn display_prompt(multi_line: bool, current_path: &PathBuf) {
 }
 
 pub fn get_home_dir() -> Option<PathBuf> {
-     std::env::var_os("HOME").map(PathBuf::from)
+    std::env::var_os("HOME").map(PathBuf::from)
 }

@@ -28,9 +28,10 @@ pub fn get_file_info(path: &Path, options: &LsFlags, name: &str) -> (Option<File
             let mode = meta.permissions().mode();
             let mut name  = if name.is_empty() {get_file_name(&path)} else {name.to_string()};
             let f_type = get_file_type(mode);
+            if has_special_chars(&name) {name = format!("'{name}'")};
             classify_name(&mut name, options, &f_type, path);
+            name = name.trim().to_string();
             let blocks = meta.blocks();
-
             file_info.name = name;
             if !options.show_long {
                 return (Some(file_info), blocks);
@@ -214,14 +215,13 @@ pub fn simple_print(files:  &Vec<(Vec<FileInfo>, String, u64)>, folders: &mut Ve
         // println!("{}, {}, {}", col_max_w, terminal_w, total_len);
         
         
-        if total_len -2 > terminal_w as usize {
+        if total_len.saturating_sub(2) > terminal_w as usize {
             // println!("{:#?}", names);
             let mut cols = terminal_w as usize / (col_max_w + 2);
             let rows = (names.len() + cols - 1) / cols;
             if cols == 0 {
                 cols = 1;
             }
-            // println!("{cols}  {rows}");
 
 
             for row in 0..rows {
@@ -367,4 +367,10 @@ fn get_columns_maxes(files: &Vec<(Vec<FileInfo>, String, u64)>, format: &mut Lon
             }
         });
     });
+}
+
+fn has_special_chars(s: &str) -> bool {
+    s.chars().any(|c| {
+        !(c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '_' || c == '/')
+    })
 }

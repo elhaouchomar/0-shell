@@ -3,7 +3,6 @@ mod helpers;
 use helpers::{sort_paths, get_file_info, simple_print, long_print};
 use structs::LsFlags;
 use std::path::PathBuf;
-use std::path::Path;
 use std::fs;
 use crate::utils::parser::Arg;
 

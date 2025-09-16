@@ -1,9 +1,9 @@
 use crate::utils::parser::Arg;
 use crate::utils::prompt::get_home_dir;
-use std::env::{current_dir, set_current_dir};
-use std::path::PathBuf;
+use std::env::{ set_current_dir};
+use std::path::{PathBuf, Path};
 
-pub fn cmd_cd(args: &[Arg], previous: &mut Option<PathBuf>) {
+pub fn cmd_cd(args: &[Arg], previous: &Path) {
     let processed_args = if args.len() > 0 && args[0].value == "--" {
         &args[1..]
     } else {
@@ -15,92 +15,51 @@ pub fn cmd_cd(args: &[Arg], previous: &mut Option<PathBuf>) {
         return;
     }
 
-    let current = current_dir().ok();
-
-    let target_path = match processed_args.get(0) {
+    match processed_args.get(0) {
         None => {
             match get_home_dir() {
-                Some(dir) => dir,
+                Some(dir) => set_dir(&dir, false),
                 None => {
-                    current.clone().unwrap_or_else(|| PathBuf::from("/"))
+                    set_dir( &PathBuf::from("/"), false)
                 }
             }
         }
         Some(arg) => {
             match arg.value.as_str() {
                 "-" => {
-                    match previous {
-                        Some(prev) => {
-                            println!("{}", prev.display());
-                            prev.clone()
-                        }
-                        None => {
-                            if let Some(ref cur) = current {
-                                println!("{}", cur.display());
-                                cur.clone()
-                            } else {
-                                PathBuf::from("/")
-                            }
-                        }
-                    }
+                    set_dir(previous, true);
                 }
                 "~" if !arg.quoted => {
                     match get_home_dir() {
-                        Some(dir) => dir,
+                        Some(dir) => set_dir(&dir, false),
                         None => {
-                            current.clone().unwrap_or_else(|| PathBuf::from("/"))
+                            set_dir( &PathBuf::from("/"), false)
                         }
                     }
                 }
                 path if path.starts_with("~/") && !arg.quoted => {
                     match get_home_dir() {
-                        Some(home) => home.join(&path[2..]),
+                        Some(home) => set_dir(&home.join(&path[2..]), false),
                         None => {
-                            current.clone().unwrap_or_else(|| PathBuf::from("/"))
-                        }
-                    }
-                }
-                ".." => {
-                    match current_dir() {
-                        Ok(current_path) => {
-                            match current_path.parent() {
-                                Some(parent) => parent.to_path_buf(),
-                                None => PathBuf::from("/")
-                            }
-                        }
-                        Err(_) => {
-                            unsafe {
-                                if let Some(ref tracked) = crate::CURRENT_TRACKED_DIR {
-                                    match tracked.parent() {
-                                        Some(parent) => parent.to_path_buf(),
-                                        None => PathBuf::from("/")
-                                    }
-                                } else {
-                                    PathBuf::from("/")
-                                }
-                            }
+                            eprintln!("cd: can't cd to {}", path)
                         }
                     }
                 }
                 path => {
-                    PathBuf::from(path)
+                   set_dir(&PathBuf::from(path), false)
                 }
             }
         }
-    };
+    }
+}
 
-    match set_current_dir(&target_path) {
+pub fn set_dir(p: &Path, print: bool) {
+    match set_current_dir(&p) {
         Ok(_) => {
-            *previous = current;
-            
-            if let Ok(new_dir) = current_dir() {
-                unsafe {
-                    crate::CURRENT_TRACKED_DIR = Some(new_dir);
-                }
-            }
+            if print {println!("{}", p.display())}
         }
         Err(_) => {
-            eprintln!("cd: can't cd to {}", target_path.display());
+            eprintln!("cd: can't cd to {}", p.display());
         }
     }
 }

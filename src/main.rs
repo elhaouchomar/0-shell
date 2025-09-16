@@ -1,31 +1,24 @@
 use crate::commands::echo::handle_escapes;
-use std::fmt::Error;
-use std::io::{stdout, Write};
-use std::path::PathBuf;
+use std::path::{PathBuf};
 mod commands;
 use std::env;
 mod utils;
 
-static mut CURRENT_TRACKED_DIR: Option<PathBuf> = None;
+fn main() {
+    if !atty::is(atty::Stream::Stdout) {
+        return;
+    }
 
-fn main() -> Result<(),std::io::Error> {
-    writeln!(stdout(),"")?;
-
-    let current_dir = env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
-    unsafe { CURRENT_TRACKED_DIR = Some(current_dir.clone()) }
-    commands::pwd::update_last_known_dir(current_dir);
+    let mut current_path = get_current_dir();
 
     let mut input = String::new();
     let mut multi_line = false;
-    let mut previous_dir: Option<PathBuf> = None;
+    let mut previous_dir= current_path.clone();
 
     loop {
         if !multi_line {
             input.clear();
         }
-        let current_path = unsafe {
-            CURRENT_TRACKED_DIR.clone().unwrap_or_else(|| PathBuf::from("/"))
-        };
 
         utils::prompt::display_prompt(multi_line, &current_path);
 
@@ -62,25 +55,27 @@ fn main() -> Result<(),std::io::Error> {
         match command.name.as_str() {
             "cat" => commands::cat::cmd_cat(&command.args),
             "cd" => {
-                commands::cd::cmd_cd(&command.args, &mut previous_dir);
-                if let Ok(current_dir) = env::current_dir() {
-                    unsafe { CURRENT_TRACKED_DIR = Some(current_dir.clone()) }
-                    commands::pwd::update_last_known_dir(current_dir);
-                }
+                commands::cd::cmd_cd(&command.args, &previous_dir);
+                previous_dir = current_path.clone();
+                current_path = get_current_dir();
+                commands::cd::set_dir(&current_path, false);
             },
             "clear" => commands::clear::cmd_clear(),
             "cp" => commands::cp::cmd_cp(&command.args),
             "echo" => {
                 commands::echo::cmd_echo(&command.args);
-                // println!("{:#?}", command.args);
             }
             "exit" => commands::exit::cmd_exit(),
             "ls" => commands::ls::cmd_ls(&command.args),
             "mkdir" => commands::mkdir::cmd_mkdir(&command.args),
             // "rm" => commands::rm::cmd_rm(&command.args),
             // "mv" => commands::mv::cmd_mv(&command.args),
-            "pwd" => commands::pwd::cmd_pwd(&command.args),
+            "pwd" => commands::pwd::cmd_pwd(&command.args, &current_path),
             _ => println!("\x1b[33m{}\x1b[0m: Command not found", command.name),
         }
     }
+}
+
+fn get_current_dir() -> PathBuf {
+    env::current_dir().unwrap_or_else(|_| PathBuf::from("/"))
 }
