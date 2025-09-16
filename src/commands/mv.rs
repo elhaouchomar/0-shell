@@ -1,98 +1,61 @@
-use crate::utils::parser::Arg;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use crate::utils::parser::Arg;
+use std::io::ErrorKind;
 
-pub fn cmd_mv(args: &[Arg]) {
-    if args.is_empty() {
-        println!("\x1b[33mmv\x1b[0m: missing file operand");
-        return;
-    }
-    if args.len() == 1 {
-        println!(
-            "\x1b[33mmv\x1b[0m: missing destination file operand after '{}'",
-            args[0].value
-        );
-        return;
-    }
-
-    let dest = Path::new(&args[args.len() - 1].value);
-    let sources = &args[..args.len() - 1];
-
-    // had case is just for: mv file1 file2
-    if sources.len() == 1 {
-        let src = Path::new(&sources[0].value);
-
-        if !src.exists() {
-            println!(
-                "mv: cannot stat '{}': No such file or directory",
-                src.display()
-            );
-            return;
+pub fn cmd_mv(args: &Vec<Arg>) {
+    match args.len() {
+        0 => {
+            println!("mv: missing file operand");
         }
+        1 => {
+            println!("mv: missing destination file operand after {}", &args[0].value);
+        }
+        2 => {
+            let path = Path::new(&args[1].value);
 
-        let final_dest = if dest.exists() && dest.is_dir() {
-            let mut new_path = PathBuf::from(dest);
-            new_path.push(src.file_name().unwrap());
-            new_path
-        } else {
-            dest.to_path_buf()
-        };
-
-        if let Err(_) = fs::rename(&src, &final_dest) {
-            
-            if let Err(copy_err) = fs::copy(&src, &final_dest) {
+            if path.exists() && path.is_dir() {
+                match fs::copy(&args[0].value, path) {
+                    Ok(_) => (),
+                    Err(e) if e.kind() == ErrorKind::NotFound => println!("errrorrr"),
+                    _ => todo!(),
+                };
+            } else if path.exists() && !path.is_dir() {
                 println!(
-                    "mv: cannot move '{}' to '{}': {}",
-                    src.display(),
-                    final_dest.display(),
-                    copy_err
+                    "mv: cannot overwrite non-directory {:} with directory {:}",
+                    &args[0].value,
+                    path.display()
                 );
                 return;
-            }
-            if src.is_file() {
-                let _ = fs::remove_file(&src);
-            } else if src.is_dir() {
-                let _ = fs::remove_dir_all(&src);
+            } else if !path.exists() {
+                match fs::rename(&args[0].value, &path) {
+                    Ok(_) => (),
+                    Err(e) => println!("mv : error : {}", e),
+                };
             }
         }
-        return;
-    }
-
-    // o hadi for multiple sources: mv file1 file2 file3 dir/
-    if !dest.exists() || !dest.is_dir() {
-        println!("mv: target '{}' is not a directory", dest.display());
-        return;
-    }
-
-    for src_arg in sources {
-        let src = Path::new(&src_arg.value);
-
-        if !src.exists() {
-            println!(
-                "mv: cannot stat '{}': No such file or directory",
-                src.display()
-            );
-            continue;
-        }
-
-        let mut new_path = PathBuf::from(dest);
-        new_path.push(src.file_name().unwrap());
-
-        if let Err(_) = fs::rename(&src, &new_path) {
-
-            if let Err(copy_err) = fs::copy(&src, &new_path) {
-                println!(
-                    "mv: cannot move '{}' to '{}': {}",
-                    src.display(),
-                    new_path.display(),
-                    copy_err
-                );
-                continue;
-            }
-            if src.is_file() {
-                let _ = fs::remove_file(&src);
-            } else if src.is_dir() {
-                let _ = fs::remove_dir_all(&src);
+        _ => {
+            let destin = Path::new(&args[args.len() - 1].value);
+            if destin.exists() && destin.is_dir() {
+                for arg in &args[..args.len() - 1] {
+                    let src = Path::new(&arg.value);
+                    if !src.exists() {
+                        println!("mv: cannot stat '{}': No such file or directory", src.display());
+                        continue;
+                    }
+                    let mut new_path = destin.to_path_buf();
+                    if let Some(name) = src.file_name() {
+                        new_path.push(name);
+                        match fs::rename(src, &new_path) {
+                            Ok(_) => (),
+                            Err(e) => println!("mv: cannot move '{}': {}", src.display(), e),
+                        }
+                    } else {
+                        println!("mv: invalid source '{}'", src.display());
+                    }
+                }
+            } else {
+                println!("mv: target '{}' is not a directory", destin.display());
             }
         }
     }
