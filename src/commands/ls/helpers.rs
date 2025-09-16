@@ -1,6 +1,6 @@
 use super::structs::*;  
 use std::path::Path;
-use std::time::SystemTime;
+use std::time::{SystemTime, Duration};
 use chrono::{DateTime, Local};
 use libc::{major, minor};
 use std::fs::{self, Metadata};
@@ -83,6 +83,10 @@ fn get_file_name(path: &Path) -> String {
     }
 }
 
+// /usr/bin/passwd
+//0000 101 101 001 100
+//0001 000 001 000 000 
+
 
 fn get_permissions(mode: u32, f_type: &FileType) -> String {
     let mut  perm = String::new();
@@ -162,7 +166,8 @@ fn get_group_name(gid: u32) -> String {
 }
 
 fn get_mod_time(meta: &Metadata) -> String {
-    let last_mod_time = meta.modified().unwrap_or(SystemTime::now());
+    let mut last_mod_time = meta.modified().unwrap_or(SystemTime::now());
+    last_mod_time += Duration::from_secs(60 * 60);
     let last_mod_time: DateTime<Local> = DateTime::from(last_mod_time);
     let now: DateTime<Local> = SystemTime::now().into();
     let six_months = chrono::Duration::days(180);
