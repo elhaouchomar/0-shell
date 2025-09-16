@@ -50,7 +50,16 @@ pub fn cmd_ls(args: &Vec<Arg>) {
     for str_path in paths {
         let mut files = Vec::new();
         let path = PathBuf::from(&str_path);
-        if path.is_dir() {
+
+        let metadata = match fs::symlink_metadata(&path) {
+            Ok(m) => m,
+            Err(e) => {
+                println!("ls: cannot access '{}': {}", path.to_string_lossy(), e);
+                continue;
+            }
+        };
+
+        if path.is_dir() && (!metadata.file_type().is_symlink() || !options.show_long) {
             let mut curr = path.clone();
             let mut parrent = path.clone();
             curr.push(".");
