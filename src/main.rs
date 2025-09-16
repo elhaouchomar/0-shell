@@ -71,6 +71,7 @@ fn main() {
             "rm" => commands::rm::cmd_rm(&command.args),
             "mv" => commands::mv::cmd_mv(&command.args),
             "pwd" => commands::pwd::cmd_pwd(&command.args, &current_path),
+            "" => {},
             _ => println!("\x1b[33m{}\x1b[0m: Command not found", command.name),
         }
     }
