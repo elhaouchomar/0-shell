@@ -8,5 +8,5 @@ pub mod cat;
 
 pub mod mkdir;
 pub mod cp;
-// pub mod rm;
-// pub mod mv;
+pub mod mv;
+pub mod rm;

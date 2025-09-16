@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::{ self, Write };
 use std::path::PathBuf;
 
 pub fn display_prompt(multi_line: bool, current_path: &PathBuf) {
